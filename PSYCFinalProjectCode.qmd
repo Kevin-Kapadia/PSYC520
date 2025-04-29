@@ -1,0 +1,268 @@
+---
+title: "PSYC520 Final Project"
+format: html
+editor: visual
+---
+
+```{r, include=FALSE, warning=FALSE, message=FALSE}
+setwd("~/Desktop/USC/Schoolwork/PSYC520/Final Project")
+library(tidyverse)
+library(skimr)
+library(flextable)
+library(sjPlot)
+library(lavaan)
+library(psych)
+library(GPArotation)
+library(nFactors)
+library(writexl)
+```
+
+## Data Preparation {.hidden}
+
+```{r, include=FALSE}
+fullData <- read.csv("SBMS_SONA.csv")
+fullData <- fullData %>% 
+  filter(Finished == TRUE) %>% 
+  distinct()
+sbms <- fullData %>% select(starts_with("SBMS"), starts_with("DOSPERT"), starts_with("BNT"), starts_with("CRT"), starts_with("BIS"), starts_with("ATGS"), Recency, Frequency, Typical.Bet, Type, Age, Race.Ethnicity, Gender)
+sbms <- sbms %>% filter(Typical.Bet != 0, Frequency != 0, Recency < 90)
+```
+
+### External Measures {.hidden}
+
+SBMS
+```{r, include=FALSE}
+scaleMax <- 6
+scaleMin <- 1
+
+sbms <- sbms %>%
+  mutate(
+    SBMS_4 = scaleMax + scaleMin - SBMS_4,  
+    SBMS_9 = scaleMax + scaleMin - SBMS_9,  
+    SBMS_10 = scaleMax + scaleMin - SBMS_10, 
+    SBMS_13 = scaleMax + scaleMin - SBMS_13, 
+    SBMS_16 = scaleMax + scaleMin - SBMS_16, 
+    SBMS_20 = scaleMax + scaleMin - SBMS_20, 
+    SBMS_24 = scaleMax + scaleMin - SBMS_24, 
+    SBMS_26 = scaleMax + scaleMin - SBMS_26, 
+    SBMS_28 = scaleMax + scaleMin - SBMS_28, 
+    
+    SBMS_All = rowMeans(select(., starts_with("SBMS")), na.rm = TRUE),
+    SBMS_Financial = rowMeans(select(., SBMS_1, SBMS_2, SBMS_3, SBMS_4, SBMS_5, SBMS_6), na.rm = TRUE),
+    SBMS_Social = rowMeans(select(., SBMS_7, SBMS_8, SBMS_9, SBMS_10, SBMS_11, SBMS_12, SBMS_13), na.rm = TRUE),
+    SBMS_Entertainment = rowMeans(select(., SBMS_14, SBMS_15, SBMS_16, SBMS_17, SBMS_18, SBMS_19, SBMS_20), na.rm = TRUE),
+    SBMS_Challenge = rowMeans(select(., SBMS_21, SBMS_22, SBMS_23, SBMS_24, SBMS_25, SBMS_26), na.rm = TRUE),
+    SBMS_Emotional = rowMeans(select(., SBMS_27, SBMS_28, SBMS_29, SBMS_30, SBMS_31, SBMS_32), na.rm = TRUE)
+  )
+```
+
+DOSPERT
+```{r, include=FALSE}
+sbms <- sbms %>% mutate(DOSPERT_All = rowMeans(select(., starts_with("DOSPERT")), na.rm = TRUE))
+```
+
+BNT
+```{r, include=FALSE}
+sbms <- sbms %>% mutate(BNT1_Correct = if_else(BNT1 == 30, 1, 0))
+sbms <- sbms %>% mutate(BNT2_Correct = if_else(BNT2 == 0.25, 1, 0))
+sbms <- sbms %>% mutate(BNT3_Correct = if_else(BNT3 == 20, 1, 0))
+sbms <- sbms %>% mutate(BNT4_Correct = if_else(BNT4 == 0.5, 1, 0))
+
+sbms <- sbms %>% mutate(BNT_Score = rowSums(select(., BNT1_Correct, BNT2_Correct, BNT3_Correct, BNT4_Correct)))
+```
+
+CRT
+```{r, include=FALSE}
+sbms <- sbms %>% mutate(CRT1_Correct = if_else(CRT1 == 5, 1, 0))
+sbms <- sbms %>% mutate(CRT2_Correct = if_else(CRT2 == 5, 1, 0))
+sbms <- sbms %>% mutate(CRT3_Correct = if_else(CRT3 == 47, 1, 0))
+
+sbms <- sbms %>% mutate(CRT_Score = rowSums(select(., CRT1_Correct, CRT2_Correct, CRT3_Correct)))
+```
+
+BIS
+```{r, include=FALSE}
+scaleMax <- 4
+scaleMin <- 1
+
+sbms <- sbms %>%
+  mutate(
+    BIS_Short_2 = scaleMax + scaleMin - BIS_Short_2,  
+    BIS_Short_3 = scaleMax + scaleMin - BIS_Short_3,   
+    BIS_Short_4 = scaleMax + scaleMin - BIS_Short_4,   
+    BIS_Short_5 = scaleMax + scaleMin - BIS_Short_5,  
+    BIS_Short_10 = scaleMax + scaleMin - BIS_Short_10,  
+    BIS_Short_11 = scaleMax + scaleMin - BIS_Short_11, 
+    BIS_Short_12 = scaleMax + scaleMin - BIS_Short_12,  
+    BIS_Short_13 = scaleMax + scaleMin - BIS_Short_13,  
+    
+    BIS_All = rowMeans(select(., starts_with("BIS")), na.rm = TRUE),
+    BIS_Attention = rowMeans(select(., BIS_Short_1, BIS_Short_2, BIS_Short_3, BIS_Short_4, BIS_Short_5), na.rm = TRUE),
+    BIS_Motor = rowMeans(select(., BIS_Short_6, BIS_Short_7, BIS_Short_8, BIS_Short_9), na.rm = TRUE),
+    BIS_Planning = rowMeans(select(., BIS_Short_10, BIS_Short_11, BIS_Short_12, BIS_Short_13), na.rm = TRUE)
+  )
+```
+
+ATGS
+```{r, include=FALSE}
+scaleMax <- 5
+scaleMin <- 1
+
+sbms <- sbms %>%
+  mutate(
+    ATGS_2 = scaleMax + scaleMin - ATGS_2,  
+    ATGS_3 = scaleMax + scaleMin - ATGS_3,
+    ATGS_5 = scaleMax + scaleMin - ATGS_5,
+    ATGS_8 = scaleMax + scaleMin - ATGS_8,
+    
+    ATGS_All = rowMeans(select(., starts_with("ATGS")), na.rm = TRUE)
+  )
+```
+
+### Non Scale Questions {.hidden}
+
+Type of Bet
+```{r, include=FALSE}
+sbms <- sbms %>%
+  mutate(Type = factor(recode(Type, 
+                       `1` = "Moneyline",
+                       `2` = "Spread",
+                       `3` = "Over/Under",
+                       `4` = "Individual Player",
+                       `5` = "Other")))
+```
+
+Race/Ethnicity
+```{r, include=FALSE}
+sbms <- sbms %>%
+  mutate(Race.Ethnicity = factor(recode(Race.Ethnicity, 
+                       `1` = "African American or Black",
+                       `2` = "American Indian or Alaskan Native",
+                       `3` = "East Asian",
+                       `4` = "Middle Eastern or North African",
+                       `5` = "Native Hawaiian or Other Pacific Islander",
+                       `6` = "Non-White Hispanic",
+                       `7` = "South Asian",
+                       `8` = "White (Hispanic)",
+                       `9` = "White (Non-Hispanic)",
+                       `10` = "Other")))
+```
+
+Gender
+```{r, include=FALSE}
+sbms <- sbms %>%
+  mutate(Gender = factor(recode(Gender, 
+                       `1` = "Male",
+                       `2` = "Female",
+                       `3` = "Other")))
+```
+
+
+## Data Analysis
+
+### Summary Statistics
+
+```{r, echo=FALSE}
+sbmsKeep <- sbms %>% select(Recency, Frequency, Typical.Bet, Type, Age, Race.Ethnicity, Gender, SBMS_All, SBMS_Financial, SBMS_Social, SBMS_Challenge, SBMS_Emotional, SBMS_Entertainment, DOSPERT_All, BNT_Score, CRT_Score, ATGS_All, BIS_All, BIS_Attention, BIS_Motor, BIS_Planning)
+
+numericSummary <- skim(sbmsKeep)
+
+numericSummary <- numericSummary %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+numericSummary
+```
+
+```{r, echo=FALSE}
+sbmsKeep %>%
+  select(where(is.factor)) %>%  
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Level") %>%
+  count(Variable, Level) %>%
+  group_by(Variable) %>%
+  mutate(Percent = round(100 * n / sum(n), 2)) %>%
+  arrange(Variable, desc(n))
+```
+
+
+### Correlations
+
+```{r, echo=FALSE}
+corMatrix <- sbmsKeep %>%
+  select(where(is.numeric)) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  round(2)
+
+corMatrix[upper.tri(corMatrix)] <- NA
+corAll <- as.data.frame(corMatrix)
+corAll
+write_xlsx(corAll, "studyCorrelations.xlsx")
+```
+
+SBMS Correlations
+```{r, echo=FALSE}
+itemData <- fullData %>% select(starts_with("SBMS"))
+
+corMatrix <- itemData %>%
+  select(where(is.numeric)) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  round(2)
+
+corMatrix[upper.tri(corMatrix)] <- NA
+corSBMS <- as.data.frame(corMatrix)
+write_xlsx(corSBMS, "sbmsCorrelations.xlsx")
+```
+
+
+
+
+### Regressions
+
+SBMS Regressions
+```{r, echo=FALSE}
+sbmsFinancialRegression <- lm(SBMS_Financial ~ DOSPERT_All + BNT_Score + CRT_Score + ATGS_All + BIS_Attention + BIS_Motor + BIS_Planning + Age + Recency + Frequency + Typical.Bet, data = sbmsKeep)
+sbmsSocialRegression <- lm(SBMS_Social ~ DOSPERT_All + BNT_Score + CRT_Score + ATGS_All + BIS_Attention + BIS_Motor + BIS_Planning + Age + Recency + Frequency + Typical.Bet, data = sbmsKeep)
+sbmsChallengeRegression <- lm(SBMS_Challenge ~ DOSPERT_All + BNT_Score + CRT_Score + ATGS_All + BIS_Attention + BIS_Motor + BIS_Planning + Age + Recency + Frequency + Typical.Bet, data = sbmsKeep)
+sbmsEmotionalRegression <- lm(SBMS_Emotional ~ DOSPERT_All + BNT_Score + CRT_Score + ATGS_All + BIS_Attention + BIS_Motor + BIS_Planning + Age + Recency + Frequency + Typical.Bet, data = sbmsKeep)
+sbmsEntertainmentRegression <- lm(SBMS_Entertainment ~ DOSPERT_All + BNT_Score + CRT_Score + ATGS_All + BIS_Attention + BIS_Motor + BIS_Planning + Age + Recency + Frequency + Typical.Bet, data = sbmsKeep)
+
+
+tab_model(sbmsFinancialRegression, sbmsSocialRegression, sbmsChallengeRegression, sbmsEmotionalRegression, sbmsEntertainmentRegression, show.ci = FALSE)
+```
+
+
+### CFA
+
+```{r}
+faData <- fullData %>% select(starts_with("SBMS"))
+
+removeItems <- c("SBMS_3", "SBMS_6", "SBMS_9", "SBMS_10", "SBMS_13", "SBMS_14", "SBMS_16", "SBMS_20", "SBMS_24", "SBMS_26", "SBMS_28", "SBMS_32")
+
+faData <- faData[ , !(names(faData) %in% removeItems)]
+
+cfaModel <- "
+  F1 =~ SBMS_1 + SBMS_2 + SBMS_4 + SBMS_5 
+  F2 =~ SBMS_7 + SBMS_8 + SBMS_11 + SBMS_12 
+  F3 =~ SBMS_15 + SBMS_17 + SBMS_18 + SBMS_19
+  F4 =~ SBMS_21 + SBMS_22 + SBMS_23 + SBMS_25
+  F5 =~ SBMS_27 + SBMS_29 + SBMS_30 + SBMS_31
+"
+```
+
+```{r}
+cfaFit <- cfa(cfaModel, data = faData, ordered = TRUE, estimator = "WLSMV")  
+summary(cfaFit, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+```
+
+```{r}
+cfaLoadings <- inspect(cfaFit, "std.lv")$lambda
+threshold <- 0.4
+cfaLoadingsFiltered <- cfaLoadings
+cfaLoadingsFiltered[abs(cfaLoadingsFiltered) < threshold] <- NA
+
+round(cfaLoadingsFiltered, 2)
+```
+
+
+
+
+
+
